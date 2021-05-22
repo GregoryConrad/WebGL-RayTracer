@@ -1,4 +1,4 @@
-# [WebGL Ray Tracing Example](http://www.gsconrad.com/WebGL-RayTracer/)
+# [WebGL Ray Tracing Example](https://www.gsconrad.com/WebGL-RayTracer/)
 **Created by Gregory Conrad**
 
 ## Description
