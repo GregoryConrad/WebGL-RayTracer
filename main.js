@@ -22,7 +22,7 @@ let fps = 0;
 // The main function called on window load
 function main() {
 
-    // WebGL Setup
+    // WebGL setup
     const canvas = document.querySelector('canvas');
     gl = WebGLUtils.setupWebGL(canvas, undefined);
     if (!gl) {
@@ -33,7 +33,7 @@ function main() {
     gl.useProgram(program);
     gl.viewport(0, 0, canvas.width, canvas.height);
 
-    // Ray Tracing Setup
+    // Ray tracing setup
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(glBounds), gl.STATIC_DRAW);
@@ -41,10 +41,10 @@ function main() {
     gl.enableVertexAttribArray(pos);
     gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
 
-    // Trigger First Render
+    // Trigger first render
     requestAnimationFrame(render);
 
-    // Trigger Frame Rate Display Updates
+    // Trigger frame rate display updates
     setInterval(() => {
         const text = `Frame Rate: ${fps.toFixed(2)} fps`;
         document.getElementById('fps').textContent = text;

@@ -58,7 +58,6 @@
             vec3 color;
         };
 
-
         Light light;
         Sphere spheres[maxObjs];
         Plane planes[maxObjs];
@@ -94,20 +93,20 @@
             numSpheres = 2;
             numPlanes = 1;
 
-            vec4 start = vec4(0.0, 0.2, 0.0, 1.0);
-            vec3 mainOrbitOffset = vec3(0.0, 0.5, 0.0);
+            vec4 origin = vec4(0.0, 0.0, 0.0, 1.0);
+            vec3 mainOrbitOffset = vec3(0.0, 0.6, 0.0);
             mat4 mainOrbitMat = rotateZ(alpha * 2.0 * PI) * translate(mainOrbitOffset);
-            vec3 secondOrbitOffset = vec3(0.0, 0.1, -0.3);
+            vec3 secondOrbitOffset = vec3(0.0, 0.25, -0.3);
             mat4 secondOrbitMat = rotateZ(alpha * 4.0 * PI) * translate(secondOrbitOffset);
 
             spheres[0].color = vec3(0.0, 0.0, 1.0);
             spheres[0].reflectivity = 0.2;
-            spheres[0].center = (mainOrbitMat * start).xyz;
+            spheres[0].center = (mainOrbitMat * origin).xyz;
             spheres[0].radius = 0.12;
 
             spheres[1].color = vec3(0.4, 0.4, 0.0);
             spheres[1].reflectivity = 0.8;
-            spheres[1].center = (mainOrbitMat * secondOrbitMat * start).xyz;
+            spheres[1].center = (mainOrbitMat * secondOrbitMat * origin).xyz;
             spheres[1].radius = 0.1;
 
             planes[0].color = vec3(0.3, 0.3, 0.3);
@@ -137,14 +136,11 @@
             spheres[2].center = vec3(-0.5, -0.5, 0.0);
             spheres[2].radius = 0.25;
 
-            float planeOffset = 2.5;
-            vec4 start1 = vec4(planeOffset, 0.0, -1.0, 1.0);
-            vec4 start2 = vec4(-planeOffset, 0.0, -1.0, 1.0);
             mat4 rotMat = rotateZ(alpha * 2.0 * PI);
 
             planes[0].color = vec3(0.4, 0.4, 0.4);
             planes[0].reflectivity = 0.3;
-            planes[0].point = (rotMat * start1).xyz;
+            planes[0].point = (rotMat * vec4(2.5, 0.0, -1.0, 1.0)).xyz;
             planes[0].normal = normalize(-planes[0].point);
         }
 
