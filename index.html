@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>WebGL Ray Tracer</title>
+
+    <script id="vshader" type="x-shader/x-vertex">
+        attribute vec2 vPosition;
+        varying vec2 fPosition;
+
+        void main() {
+            fPosition = vPosition;
+            gl_Position = vec4(vPosition, 0.0, 1.0);
+        }
+    </script>
+
+    <script id="fshader" type="x-shader/x-fragment">
+        precision highp float;
+        varying vec2 fPosition;
+
+        const int maxObjs = 10;
+        const int maxReflections = 100;
+
+        uniform float alpha;
+        uniform float img;
+        uniform float reflections;
+        uniform float focalLength;
+
+
+        struct Sphere {
+            vec3 center;
+            float radius;
+            vec3 color;
+            float reflectivity;
+        };
+
+        struct Plane {
+            vec3 point;
+            vec3 normal;
+            vec3 color;
+            float reflectivity;
+        };
+
+        struct Ray {
+            vec3 origin;
+            vec3 direction;
+            float intensity;
+        };
+
+        struct Light {
+            vec3 position;
+            vec3 ambient, diffuse, specular;
+        };
+
+        struct RayTracerOutput {
+            Ray reflectedRay;
+            vec3 color;
+        };
+
+
+        Light light;
+        Sphere spheres[maxObjs];
+        Plane planes[maxObjs];
+        int numSpheres = 0, numPlanes = 0;
+
+
+        const float PI = 3.14159265358979323846264;
+
+        mat4 rotateZ(float theta) {
+            float c = cos(theta);
+            float s = sin(theta);
+            return mat4(
+                c, s, 0.0, 0.0,
+                -s, c, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            );
+        }
+
+        mat4 translate(vec3 offset) {
+            return mat4(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                offset.x, offset.y, offset.z, 1.0
+            );
+        }
+
+
+        // Initialization function for image 1
+        void init1() {
+            light.position = vec3(1.5, 1.5, 1.0);
+            numSpheres = 2;
+            numPlanes = 1;
+
+            vec4 start = vec4(0.0, 0.2, 0.0, 1.0);
+            vec3 mainOrbitOffset = vec3(0.0, 0.5, 0.0);
+            mat4 mainOrbitMat = rotateZ(alpha * 2.0 * PI) * translate(mainOrbitOffset);
+            vec3 secondOrbitOffset = vec3(0.0, 0.1, -0.3);
+            mat4 secondOrbitMat = rotateZ(alpha * 4.0 * PI) * translate(secondOrbitOffset);
+
+            spheres[0].color = vec3(0.0, 0.0, 1.0);
+            spheres[0].reflectivity = 0.2;
+            spheres[0].center = (mainOrbitMat * start).xyz;
+            spheres[0].radius = 0.12;
+
+            spheres[1].color = vec3(0.4, 0.4, 0.0);
+            spheres[1].reflectivity = 0.8;
+            spheres[1].center = (mainOrbitMat * secondOrbitMat * start).xyz;
+            spheres[1].radius = 0.1;
+
+            planes[0].color = vec3(0.3, 0.3, 0.3);
+            planes[0].reflectivity = 0.3;
+            planes[0].point = vec3(0.0, 0.0, -0.8);
+            planes[0].normal = vec3(0.0, 0.0, 1.0);
+        }
+
+        // Initialization function for image 2
+        void init2() {
+            light.position = vec3(0.0, 0.0, 0.6);
+            numSpheres = 3;
+            numPlanes = 1;
+
+            spheres[0].color = vec3(0.0, 0.0, 1.0);
+            spheres[0].reflectivity = 0.7;
+            spheres[0].center = vec3(0.0, 0.5, 0.0);
+            spheres[0].radius = 0.25;
+
+            spheres[1].color = vec3(0.0, 1.0, 0.0);
+            spheres[1].reflectivity = 0.7;
+            spheres[1].center = vec3(0.5, -0.5, 0.0);
+            spheres[1].radius = 0.25;
+
+            spheres[2].color = vec3(1.0, 0.0, 0.0);
+            spheres[2].reflectivity = 0.7;
+            spheres[2].center = vec3(-0.5, -0.5, 0.0);
+            spheres[2].radius = 0.25;
+
+            float planeOffset = 2.5;
+            vec4 start1 = vec4(planeOffset, 0.0, -1.0, 1.0);
+            vec4 start2 = vec4(-planeOffset, 0.0, -1.0, 1.0);
+            mat4 rotMat = rotateZ(alpha * 2.0 * PI);
+
+            planes[0].color = vec3(0.4, 0.4, 0.4);
+            planes[0].reflectivity = 0.3;
+            planes[0].point = (rotMat * start1).xyz;
+            planes[0].normal = normalize(-planes[0].point);
+        }
+
+        // Initialization function for image 3
+        void init3() {
+            light.position = vec3(sin(alpha * 2.0 * PI), 0.5, 0.5);
+            numSpheres = 2;
+            numPlanes = 3;
+
+            spheres[0].color = vec3(0.5, 0.5, 0.5);
+            spheres[0].reflectivity = 0.5;
+            spheres[0].center = vec3(0.0, -0.75, -0.3);
+            spheres[0].radius = 0.25;
+
+            spheres[1].color = vec3(1.0, 1.0, 1.0);
+            spheres[1].reflectivity = 0.0;
+            spheres[1].center = vec3(0.0, 0.3, -2.0);
+            spheres[1].radius = 0.25;
+
+            planes[0].color = vec3(1.0, 0.0, 0.0);
+            planes[0].reflectivity = 0.0;
+            planes[0].point = vec3(-1.0, 1.0, 0.0);
+            planes[0].normal = normalize(-planes[0].point);
+
+            planes[1].color = vec3(0.0, 1.0, 0.0);
+            planes[1].reflectivity = 0.0;
+            planes[1].point = vec3(1.0, 1.0, 0.0);
+            planes[1].normal = normalize(-planes[1].point);
+
+            planes[2].color = vec3(0.0, 0.0, 1.0);
+            planes[2].reflectivity = 0.0;
+            planes[2].point = vec3(0.0, -1.0, 0.0);
+            planes[2].normal = vec3(0.0, 1.0, 0.0);
+        }
+
+        // Initializes the objects in the world
+        void initWorld() {
+            light.ambient = vec3(0.2, 0.2, 0.2);
+            light.diffuse = vec3(0.8, 0.8, 0.8);
+            light.specular = vec3(0.95, 0.95, 0.95);
+
+            if (img < 1.5) {
+                init1();
+            } else if (img < 2.5) {
+                init2();
+            } else if (img < 3.5) {
+                init3();
+            }
+        }
+
+
+        // Checks if the specified ray intersects the specified sphere
+        float checkIntersectSphere(Sphere sphere, Ray ray) {
+            vec3 sphereCenter = sphere.center;
+            float radius = sphere.radius;
+            vec3 cameraSource = ray.origin;
+            vec3 cameraDirection = ray.direction;
+
+            vec3 distanceFromCenter = (cameraSource - sphereCenter);
+            float B = 2.0 * dot(cameraDirection, distanceFromCenter);
+            float C = dot(distanceFromCenter, distanceFromCenter) - pow(radius, 2.0);
+            float delta = pow(B, 2.0) - 4.0 * C;
+            float t = 0.0;
+            if (delta > 0.0) {
+                float sqRoot = sqrt(delta);
+                float t1 = (-B + sqRoot) / 2.0;
+                float t2 = (-B - sqRoot) / 2.0;
+                t = min(t1, t2);
+            }
+            if (delta == 0.0) {
+                t = -B / 2.0;
+            }
+
+            return t;
+        }
+
+        // Checks if the specified ray intersects the specified plane
+        float checkIntersectPlane(Plane plane, Ray ray) {
+            float numerator = dot(plane.point - ray.origin, plane.normal);
+            float denominator = dot(ray.direction, plane.normal);
+            if (denominator == 0.0) return 0.0;
+            return numerator / denominator;
+        }
+
+        // Checks to see if a ray intersects a world object before the light
+        // Used for the shadow ray
+        bool intersectsBeforeLight(Ray ray) {
+            float distanceToLight = distance(ray.origin, light.position);
+
+            // Spheres
+            for (int i = 0; i < maxObjs; i++) {
+                if (i >= numSpheres) break;
+                float t = checkIntersectSphere(spheres[i], ray);
+                if (t > 0.0 && t < distanceToLight) {
+                    return true;
+                }
+            }
+
+            // Planes
+            for (int i = 0; i < maxObjs; i++) {
+                if (i >= numPlanes) break;
+                float t = checkIntersectPlane(planes[i], ray);
+                if (t > 0.0 && t < distanceToLight) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+
+        // Traces a ray through the world
+        // Returns a reflection ray and a calculated color
+        RayTracerOutput traceRay(Ray ray) {
+
+            // Conduct intersection testing
+            float minT = 100000.0;
+            int typeToShow = 0; // 0 for nothing, 1 for sphere, 2 for plane
+            Sphere sphere;
+            Plane plane;
+
+            // Sphere intersection testing
+            for (int i = 0; i < maxObjs; i++) {
+                if (i >= numSpheres) break;
+                float t = checkIntersectSphere(spheres[i], ray);
+                if (t > 0.0 && t < minT) {
+                    minT = t;
+                    sphere = spheres[i];
+                    typeToShow = 1;
+                }
+            }
+
+            // Plane intersection testing
+            for (int i = 0; i < maxObjs; i++) {
+                if (i >= numPlanes) break;
+                float t = checkIntersectPlane(planes[i], ray);
+                if (t > 0.0 && t < minT) {
+                    minT = t;
+                    plane = planes[i];
+                    typeToShow = 2;
+                }
+            }
+
+            // Calculate ray color & reflection
+            RayTracerOutput rayTracer;
+            vec3 color = vec3(0.0, 0.0, 0.0);
+            if (typeToShow > 0) {
+
+                // Get variables from the intersected object
+                vec3 surfacePoint = ray.origin + (minT * ray.direction);
+                vec3 surfaceNormal;
+                vec3 objColor;
+                float reflectivity;
+                if (typeToShow == 1) {
+                    surfaceNormal = normalize(surfacePoint - sphere.center);
+                    objColor = sphere.color;
+                    reflectivity = sphere.reflectivity;
+                } else if (typeToShow == 2) {
+                    surfaceNormal = plane.normal;
+                    objColor = plane.color;
+                    reflectivity = plane.reflectivity;
+                }
+
+                // Ambient light
+                color += light.ambient * objColor;
+
+                // Shadow check
+                // Only show diffuse + specular if we are not in shadow
+                vec3 L = normalize(light.position - surfacePoint);
+                Ray shadowRay;
+                shadowRay.origin = surfacePoint + 0.00001 * L;
+                shadowRay.direction = L;
+                if (!intersectsBeforeLight(shadowRay)) {
+                    vec3 N = surfaceNormal;
+
+                    // Diffuse light
+                    color += light.diffuse * objColor * max(0.0, dot(L, N));
+
+                    // Specular light
+                    float shininess = 20.0;
+                    vec3 R = reflect(-L, N);
+                    vec3 C = normalize(ray.origin - surfacePoint);
+                    float specular = pow(max(dot(R, C), 0.0), shininess);
+                    color += light.specular * specular * reflectivity;
+                }
+
+                // Reflection ray
+                Ray reflectionRay;
+                vec3 reflection = reflect(ray.direction, surfaceNormal);
+                reflectionRay.origin = surfacePoint + 0.00001 * reflection;
+                reflectionRay.direction = reflection;
+                reflectionRay.intensity = ray.intensity * reflectivity;
+                rayTracer.reflectedRay = reflectionRay;
+            }
+            rayTracer.color = color * ray.intensity;
+
+            return rayTracer;
+        }
+
+
+        void main() {
+
+            // Initialize the world objects
+            initWorld();
+
+            // Create the first ray
+            Ray currRay;
+            currRay.origin = vec3(0.0, 0.0, focalLength);
+            currRay.direction = normalize(vec3(fPosition, -focalLength));
+            currRay.intensity = 1.0;
+
+            // Calculate the final color
+            vec3 color = vec3(0.0, 0.0, 0.0);
+            for (int i = 0; i <= maxReflections; i++) {
+                if (i > int(reflections)) break;
+                RayTracerOutput rayTracer = traceRay(currRay);
+                color += rayTracer.color;
+                currRay = rayTracer.reflectedRay;
+            }
+            gl_FragColor = vec4(color, 1.0);
+        }
+    </script>
+
+    <script src="lib/webgl-utils.js"></script>
+    <script src="lib/initShaders.js"></script>
+    <script src="lib/MV.js"></script>
+
+    <script src="main.js"></script>
+</head>
+
+<body onload="main()" style="text-align:center;">
+    <h1>WebGL Ray Tracing Example</h1>
+    <h4>Created by Gregory Conrad</h4>
+    <div style="display: inline-flex;">
+        <div style="padding: 32px; margin: auto;">
+            <span id="fps">Frame Rate: calculating...</span>
+            <br>
+            <br>
+            <label for="focal-length">Focal Length:</label>
+            <input type="number" min="0.2" max="10" step="0.2" value="2" id="focal-length" name="focal-length">
+            <br>
+            <br>
+            <label for="number-reflections">Number of Reflections:</label>
+            <input type="number" min="0" max="100" step="1" value="2" id="number-reflections" name="number-reflections">
+            <br>
+            <br>
+            <label for="image">Choose Image:</label>
+            <select name="image" id="image">
+                <option value="1">Image 1</option>
+                <option value="2">Image 2</option>
+                <option value="3">Image 3</option>
+            </select>
+        </div>
+        <canvas width="600" height="600">
+            Please use a browser that supports the "canvas" tag.
+        </canvas>
+    </div>
+</body>
+
+</html>
